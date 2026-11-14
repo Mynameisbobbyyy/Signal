@@ -41,7 +41,7 @@ button{background:#1d3a52;color:var(--tx);border:1px solid #2c5679;border-radius
 </head>
 <body>
 <main>
-<h1>Futures Signal Pro <small>Binance Futures · เรียลไทม์</small></h1>
+<h1>Futures Signal v3 <small>Binance Futures · เรียลไทม์</small></h1>
 <div class="top">
 <label>กรอบเวลา<select id="iv"><option value="5m">5 นาที</option><option value="15m" selected>15 นาที</option><option value="1h">1 ชั่วโมง</option></select></label>
 <label>เงินทุน (บาท)<input id="cap" type="number" value="1000"></label>
@@ -78,10 +78,10 @@ button{background:#1d3a52;color:var(--tx);border:1px solid #2c5679;border-radius
 </main>
 <script>
 const SYMS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','DOGEUSDT'];
-const REST='https://fapi.binance.com',WS='wss://fstream.binance.com/stream?streams=';
+const REST='https://fapi.binance.com',WS='wss://fstream.binance.com/market/stream?streams=';
 const HTF={'5m':'1h','15m':'1h','1h':'4h'},HOLD={'5m':12,'15m':8,'1h':4};
 const $=s=>document.querySelector(s);
-const S={};let wsOk=false,loading=false,MYP=null,lastSig=null,FG=null,NEWS=null,sel='BTCUSDT',ws=null,dirty=true,btKey='',BT=null;
+const S={};let wsOk=false,wsLive=false,lastMsg=0,loading=false,MYP=null,lastSig=null,FG=null,NEWS=null,sel='BTCUSDT',ws=null,dirty=true,btKey='',BT=null;
 const f=(v,d=2)=>Number(v).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d});
 const fp=v=>v>=100?f(v,2):v>=1?f(v,4):f(v,5);
 const P=id=>+$('#'+id).value;
@@ -205,8 +205,8 @@ async function loadAll(){
 function connect(){
   if(ws){ws.onclose=null;ws.close()}
   ws=new WebSocket(WS+SYMS.map(s=>s.toLowerCase()+'@kline_'+$('#iv').value).join('/'));
-  ws.onopen=()=>{wsOk=true;$('#st').textContent='● เรียลไทม์ (WebSocket)'};
-  ws.onmessage=e=>{const m=JSON.parse(e.data).data;if(!m||!m.k)return;const st=S[m.s];if(!st)return;
+  ws.onopen=()=>{wsOk=true;$('#st').textContent='เชื่อมต่อแล้ว รอข้อมูล…'};
+  ws.onmessage=e=>{lastMsg=Date.now();if(!wsLive){wsLive=true;$('#st').textContent='● เรียลไทม์ (WebSocket)'}const m=JSON.parse(e.data).data;if(!m||!m.k)return;const st=S[m.s];if(!st)return;
     const k=m.k,c={t:k.t,o:+k.o,h:+k.h,l:+k.l,c:+k.c};
     if(st.k.at(-1).t===c.t)st.k[st.k.length-1]=c;else{st.k.push(c);st.k.shift()}st.dirty=true;dirty=true};
   ws.onclose=()=>{wsOk=false;$('#st').textContent='หลุดการเชื่อมต่อ กำลังต่อใหม่…';setTimeout(connect,3000)}}
@@ -241,6 +241,7 @@ function draw(cv,D,thr,fee,res){
 const thr=()=>P('thr');
 
 function render(){
+  if(SYMS.some(x=>S[x]))$('#st').textContent=`● สด ${new Date().toLocaleTimeString('th-TH')} · ${wsLive?'WebSocket+REST':'REST ทุก 3 วิ'}`;
   const T=thr(),cap=P('cap'),risk=P('risk'),maxpos=Math.max(1,P('maxpos')),maxlev=P('maxlev'),totrisk=P('totrisk'),fee=P('fee'),H=P('hold'),news=NEWS?NEWS.score:0;
   document.querySelectorAll('.panel').forEach(p=>{const s=p.dataset.s,st=S[s];if(!st)return;
     if(st.dirty||!st.D){st.D=prep(st.k);st.dirty=false}
@@ -318,12 +319,12 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)document.t
 
 async function poll(){
   if(!SYMS.some(x=>S[x])){loadAll();return}
-  if(wsOk)return;
+  wsLive=wsOk&&Date.now()-lastMsg<15000;
   await Promise.all(SYMS.map(async x=>{const st=S[x];if(!st)return;try{
     const j=mapK(await jget(`${REST}/fapi/v1/klines?symbol=${x}&interval=${$('#iv').value}&limit=3`));
     j.forEach(c=>{const L=st.k.at(-1);if(L.t===c.t)st.k[st.k.length-1]=c;else if(c.t>L.t){st.k.push(c);st.k.shift()}});st.dirty=true;dirty=true}catch(e){}}));
-  if(!wsOk&&SYMS.some(x=>S[x]))$('#st').textContent='● อัปเดตทุก 5 วินาที (โหมดสำรอง)'}
-setInterval(poll,5000);
+}
+setInterval(poll,3000);
 $('#iv').onchange=()=>{$('#hold').value=HOLD[$('#iv').value];loadAll()};
 ['cap','risk','maxpos','maxlev','totrisk','fee','thr','hold'].forEach(id=>$('#'+id).onchange=()=>{btKey='';dirty=true});
 setInterval(()=>{if(dirty){dirty=false;render()}},1000);
