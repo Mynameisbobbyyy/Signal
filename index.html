@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Futures Signal</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0f14;--panel:#111821;--line:#202c3a;--tx:#e6edf3;--mut:#8196aa;--up:#2ee59d;--dn:#ff5c5c;--wt:#e8b84a;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 'IBM Plex Sans Thai',system-ui,sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:1200px;margin:0 auto;padding:12px}
+h1{font-size:20px;margin:0}h2{font-size:14px;color:var(--mut);margin:0 0 8px;font-weight:500}
+.top{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:8px 0 12px}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:2px}
+select,input{background:var(--panel);color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;width:92px}
+select{width:auto}
+#st{margin-left:auto;font-size:12px;color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media(max-width:860px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.grid{grid-template-columns:1fr}}
+.panel{background:#000;border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.panel.sel{border-color:var(--wt)}
+.ph{display:flex;justify-content:space-between;gap:6px;padding:4px 8px;font-size:13px}
+.badge{font-weight:700;padding:0 8px;border-radius:4px;white-space:nowrap}
+.b-up{background:var(--up);color:#00281a}.b-dn{background:var(--dn);color:#330000}.b-wt{background:#2b3541;color:var(--wt)}
+canvas{width:100%;height:190px;display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.two{grid-template-columns:1fr}}
+.big{font-size:40px;font-weight:700;line-height:1.1}
+.up{color:var(--up)}.dn{color:var(--dn)}.wt{color:var(--wt)}
+ul{margin:6px 0 0;padding:0;list-style:none}li{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid var(--line)}li:last-child{border:0}
+.kv{display:grid;grid-template-columns:1fr auto;gap:3px 12px}.kv span:nth-child(odd){color:var(--mut)}
+table{width:100%;border-collapse:collapse}th,td{text-align:right;padding:5px 7px;border-bottom:1px solid var(--line);white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:var(--mut);font-weight:500}
+.wrap{overflow-x:auto}
+.warn{background:#241d12;border:1px solid #6b4b1e;color:#f1d9a6;font-size:13px;padding:10px 12px;border-radius:8px}
+small{color:var(--mut)}
+button{background:#1d3a52;color:var(--tx);border:1px solid #2c5679;border-radius:6px;padding:7px 12px;font:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+<h1>Futures Signal v4.2 <small>Binance Futures · เรียลไทม์</small></h1>
+<div class="top">
+<label>กรอบเวลา<select id="iv"><option value="5m">5 นาที</option><option value="15m" selected>15 นาที</option><option value="1h">1 ชั่วโมง</option></select></label>
+<label>เงินทุน (บาท)<input id="cap" type="number" value="1000"></label>
+<label>เสี่ยงต่อไม้ (บาท)<input id="risk" type="number" value="20"></label>
+<label>เปิดพร้อมกันสูงสุด<input id="maxpos" type="number" value="3"></label>
+<label>เลเวอเรจสูงสุด (x)<input id="maxlev" type="number" value="5"></label>
+<label>เสี่ยงรวมสูงสุด (บาท)<input id="totrisk" type="number" value="50"></label>
+<label>ค่าธรรมเนียม %/ข้าง<input id="fee" type="number" step="0.01" value="0.05"></label>
+<label>คะแนนขั้นต่ำเข้า<input id="thr" type="number" step="0.5" value="4"></label>
+<label>ถือสูงสุด (แท่ง)<input id="hold" type="number" value="8"></label>
+<label>อยากได้กำไรต่อไม้ (บาท)<input id="goal" type="number" value="50"></label>
+<label>ชุดเหรียญ<select id="set"><option value="small" selected>นอกกระแส ราคาต่ำ (สแกนเอง)</option><option value="big">เหรียญใหญ่ 6 ตัว</option><option value="custom">กำหนดเอง</option></select></label>
+<label>ราคา/เหรียญไม่เกิน (USDT)<input id="pmax" type="number" step="any" value="1"></label>
+<label>ซื้อขาย/วัน ต่ำสุด (ล้าน USDT)<input id="vmin" type="number" value="20"></label>
+<label>ซื้อขาย/วัน สูงสุด (ล้าน USDT)<input id="vmax" type="number" value="300"></label>
+<label>จำนวนเหรียญ<input id="nsym" type="number" value="12"></label>
+<label>กำหนดเอง (คั่นด้วย ,)<input id="cust" type="text" placeholder="PEPE,WIF,JASMY" style="width:170px"></label>
+<button id="rescan">โหลดชุดเหรียญ</button>
+<div id="st">กำลังเชื่อมต่อ…</div>
+</div>
+<small id="setinfo"></small>
+<div class="warn">ไม่มีระบบไหนแม่นยำสูงและเสี่ยงต่ำแบบการันตีได้ ระบบนี้ทำได้แค่ "เข้าให้น้อยแต่คัดเข้ม" โดยต้องผ่านหลายด่านพร้อมกัน (เทรนด์/ไซด์เวย์, แนวรับต้าน, แท่งเทียน, MACD, Bollinger, ข่าว, Funding) และคุมขนาดสถานะ ตัวเลขย้อนทดสอบอยู่ในหน้า ใช้ตัดสินใจว่ากรอบเวลาไหนควรเทรดหรือไม่ ไม่ใช่คำแนะนำลงทุน และผมไม่ใช่ที่ปรึกษาการเงิน<br><b>เหรียญนอกกระแส:</b> ราคาเหวี่ยงแรงกว่า สเปรดกว้างกว่า ถูกปั่นหรือไถลราคาได้ง่ายกว่า และรายชื่ออาจถูกถอดจากตลาด ควรเสี่ยงต่อไม้น้อยกว่าเหรียญใหญ่ ถ้าไม่ไหวให้กลับไปใช้ชุดเหรียญใหญ่</div>
+
+<div class="card" id="cmd" style="border-color:#e8b84a"></div>
+<div class="card"><h2>ไม้ที่ฉันถืออยู่ (ให้ระบบบอกว่า ถือต่อ หรือ ออก)</h2>
+<div class="top" style="margin:0 0 8px"><label>คู่<select id="ps"></select></label><label>ฝั่ง<select id="pd"><option value="1">LONG</option><option value="-1">SHORT</option></select></label><label>ราคาเข้า (ว่าง=ราคาตอนนี้)<input id="pe" type="number" step="any"></label><label>SL (ว่าง=ระบบคำนวณ)<input id="psl" type="number" step="any"></label><label>TP1 (ว่าง=ระบบคำนวณ)<input id="ptp" type="number" step="any"></label><button id="pset">เริ่มติดตาม</button><button id="pclr">ล้าง</button></div>
+<div id="pout" class="kv"></div></div>
+<div class="two">
+ <div class="card"><h2>แรงกดดันสถานการณ์โลก (ข่าว 24 ชม. + Fear &amp; Greed)</h2><div id="news">กำลังโหลด…</div></div>
+ <div class="card"><h2>ไม้ที่ผ่านเกณฑ์ตอนนี้ (เรียงตามคะแนน)</h2><div id="folio" class="wrap"></div><small id="folioNote"></small></div>
+</div>
+
+<div class="card" style="display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-top:0"><label style="flex:1;min-width:220px">เพิ่มเหรียญเอง (พิมพ์ชื่อ คั่นด้วย , เช่น PEPE,WIF,JASMY)<input id="addc" type="text" style="width:100%" placeholder="PEPE,WIF,JASMY"></label><button id="addb">เพิ่มเหรียญ</button><button id="resetb">กลับไปชุดที่สแกน</button></div>
+<div class="grid" id="grid" style="margin-top:12px"></div>
+
+<div class="two">
+ <div class="card"><h2 id="t1"></h2><div class="big" id="dir">…</div><div id="sc"></div><h2 style="margin-top:10px">เช็คลิสต์เข้าไม้ (ต้องผ่านครบทุกข้อ)</h2><ul id="gates"></ul><h2 style="margin-top:10px">ที่มาของคะแนน</h2><ul id="why"></ul></div>
+ <div>
+  <div class="card" style="margin-top:12px"><h2>แผนออเดอร์เหรียญที่เลือก</h2><div class="kv" id="plan"></div></div>
+  <div class="card"><h2>ย้อนทดสอบกฎเดียวกันกับ ~500 แท่งล่าสุด</h2><div class="kv" id="bt"></div><small>ทดสอบแบบออกทั้งก้อนที่เป้า 1 / SL / ครบเวลา ไม่รวมข่าว Funding Fear&amp;Greed อดีตไม่การันตีอนาคต</small></div>
+ </div>
+</div>
+<small id="meta"></small>
+</main>
+<script>
+function showErr(m){let b=document.getElementById('errbox');if(!b){b=document.createElement('div');b.id='errbox';b.style.cssText='position:sticky;top:0;z-index:9;background:#5a1a1a;color:#fff;padding:8px 12px;font-size:13px';document.body.prepend(b)}b.textContent='⚠ มีข้อผิดพลาด: '+m}
+window.addEventListener('error',e=>showErr(e.message+' (บรรทัด '+e.lineno+')'));
+window.addEventListener('unhandledrejection',e=>showErr(String(e.reason&&e.reason.message||e.reason)));
+const ERR={};let failMsg='';
+const BIG=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','DOGEUSDT'];
+let SYMS=BIG.slice(),picked=false;
+const REST='https://fapi.binance.com',WS='wss://fstream.binance.com/market/stream?streams=';
+const HTF={'5m':'1h','15m':'1h','1h':'4h'},HOLD={'5m':12,'15m':8,'1h':4};
+const $=s=>document.querySelector(s);
+const S={};let wsOk=false,wsLive=false,lastMsg=0,loading=false,MYP=null,lastSig=null,FG=null,NEWS=null,sel='BTCUSDT',ws=null,dirty=true,btKey='',BT=null;
+const f=(v,d=2)=>Number(v).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d});
+const fp=v=>v>=100?f(v,2):v>=1?f(v,4):f(v,5);
+const P=id=>+$('#'+id).value;
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function jget(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json()}
+const mapK=j=>j.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]}));
+
+/* ---------- indicators ---------- */
+function ema(a,n){const k=2/(n+1),o=[a[0]];for(let i=1;i<a.length;i++)o.push(a[i]*k+o[i-1]*(1-k));return o}
+function sma(a,n){return a.map((_,i)=>{if(i<n-1)return NaN;let s=0;for(let j=i-n+1;j<=i;j++)s+=a[j];return s/n})}
+function rsi(c,n=14){const o=Array(c.length).fill(50);let g=0,l=0;for(let i=1;i<c.length;i++){const d=c[i]-c[i-1],u=Math.max(d,0),w=Math.max(-d,0);if(i<=n){g+=u/n;l+=w/n}else{g=(g*(n-1)+u)/n;l=(l*(n-1)+w)/n}if(i>=n)o[i]=l===0?100:100-100/(1+g/l)}return o}
+function atr(k,n=14){const o=Array(k.length).fill(0);let a=0;for(let i=1;i<k.length;i++){const tr=Math.max(k[i].h-k[i].l,Math.abs(k[i].h-k[i-1].c),Math.abs(k[i].l-k[i-1].c));if(i<=n)a+=tr/n;else a=(a*(n-1)+tr)/n;o[i]=a}return o}
+function adx(k,n=14){const o=Array(k.length).fill(20);let tr=0,pd=0,md=0,dx=[],ax=0;
+  for(let i=1;i<k.length;i++){const up=k[i].h-k[i-1].h,dn=k[i-1].l-k[i].l;
+    const t=Math.max(k[i].h-k[i].l,Math.abs(k[i].h-k[i-1].c),Math.abs(k[i].l-k[i-1].c)),p=up>dn&&up>0?up:0,m=dn>up&&dn>0?dn:0;
+    if(i<=n){tr+=t;pd+=p;md+=m}else{tr=tr-tr/n+t;pd=pd-pd/n+p;md=md-md/n+m}
+    if(i>=n){const pi=100*pd/tr,mi=100*md/tr,d=100*Math.abs(pi-mi)/((pi+mi)||1);
+      if(i<2*n){ax+=d/n;o[i]=ax}else{ax=(ax*(n-1)+d)/n;o[i]=ax}}}return o}
+function bands(c,n=20){const bu=[],bl=[];for(let i=0;i<c.length;i++){if(i<n-1){bu.push(NaN);bl.push(NaN);continue}const s=c.slice(i-n+1,i+1),m=s.reduce((x,y)=>x+y)/n,sd=Math.sqrt(s.reduce((x,y)=>x+(y-m)**2,0)/n);bu.push(m+2*sd);bl.push(m-2*sd)}return{bu,bl}}
+function prep(k){const c=k.map(x=>x.c),e20=ema(c,20),e50=ema(c,50),e12=ema(c,12),e26=ema(c,26);const m=e12.map((v,i)=>v-e26[i]),sg=ema(m,9);
+  return{k,c,e20,e50,s200:sma(c,200),hist:m.map((v,i)=>v-sg[i]),r:rsi(c),a:atr(k),adx:adx(k),...bands(c)}}
+
+/* ---------- support / resistance (swing pivots, no look-ahead) ---------- */
+function levels(D,i){const k=D.k,c=D.c[i];let res=null,sup=null;
+  for(let j=i-2;j>=Math.max(2,i-200);j--){const h=k[j].h,l=k[j].l;
+    if(h>c&&h>k[j-1].h&&h>k[j-2].h&&h>k[j+1].h&&h>k[j+2].h&&(res===null||h<res))res=h;
+    if(l<c&&l<k[j-1].l&&l<k[j-2].l&&l<k[j+1].l&&l<k[j+2].l&&(sup===null||l>sup))sup=l}
+  return{res,sup}}
+
+/* ---------- candle patterns ---------- */
+function pats(D,i){const k=D.k,x=k[i],p=k[i-1],q=k[i-2],r=[];
+  const body=Math.abs(x.c-x.o),rng=x.h-x.l||1e-9,uw=x.h-Math.max(x.o,x.c),lw=Math.min(x.o,x.c)-x.l;
+  const dn=D.c[i]<D.e20[i],upT=D.c[i]>D.e20[i];
+  if(p.c<p.o&&x.c>x.o&&x.o<=p.c&&x.c>=p.o)r.push(['แท่งกลืนกินขาขึ้น',1.5]);
+  if(p.c>p.o&&x.c<x.o&&x.o>=p.c&&x.c<=p.o)r.push(['แท่งกลืนกินขาลง',-1.5]);
+  if(dn&&lw>=2*body&&uw<=body*.6&&body>rng*.05)r.push(['Hammer',1]);
+  if(upT&&uw>=2*body&&lw<=body*.6&&body>rng*.05)r.push(['Shooting Star',-1]);
+  const qb=Math.abs(q.c-q.o),pb=Math.abs(p.c-p.o);
+  if(q.c<q.o&&pb<qb*.4&&x.c>x.o&&x.c>(q.o+q.c)/2)r.push(['Morning Star',1.5]);
+  if(q.c>q.o&&pb<qb*.4&&x.c<x.o&&x.c<(q.o+q.c)/2)r.push(['Evening Star',-1.5]);
+  return r}
+
+/* ---------- scoring (regime aware) ---------- */
+function score(D,i,ctx={}){
+  const{htf=0,fg=null,fund=null,news=0}=ctx;let s=0;const w=[];const add=(v,t)=>{if(v){s+=v;w.push([v,t])}};
+  const c=D.c[i],a=D.a[i],ax=D.adx[i],reg=ax>=23?'trend':ax<=18?'side':'mid',lv=levels(D,i);
+  if(reg!=='side'){
+    add(D.e20[i]>D.e50[i]?1:-1,D.e20[i]>D.e50[i]?'EMA20 เหนือ EMA50':'EMA20 ใต้ EMA50');
+    if(!isNaN(D.s200[i]))add(c>D.s200[i]?.5:-.5,c>D.s200[i]?'ราคาเหนือ SMA200':'ราคาใต้ SMA200');
+    const h=D.hist[i],hp=D.hist[i-1];
+    if(h>0&&h>hp)add(1,'MACD บวกและแรงขึ้น');else if(h<0&&h<hp)add(-1,'MACD ลบและแรงลง');
+  }
+  if(reg!=='trend'){
+    const m=reg==='side'?1:.5,r=D.r[i];
+    if(r<32)add(1.5*m,`RSI ${r.toFixed(0)} ขายมากเกิน`);else if(r>68)add(-1.5*m,`RSI ${r.toFixed(0)} ซื้อมากเกิน`);
+    if(c<D.bl[i])add(1*m,'หลุดกรอบล่าง Bollinger');if(c>D.bu[i])add(-1*m,'ทะลุกรอบบน Bollinger');
+    if(lv.sup!==null&&c-lv.sup<.6*a)add(1.5*m,'ราคาชิดแนวรับ');
+    if(lv.res!==null&&lv.res-c<.6*a)add(-1.5*m,'ราคาชิดแนวต้าน');
+  }else{const r=D.r[i];if(r>50&&r<70)add(.5,`RSI ${r.toFixed(0)} โมเมนตัมขึ้น`);if(r<50&&r>30)add(-.5,`RSI ${r.toFixed(0)} โมเมนตัมลง`)}
+  pats(D,i).forEach(([n,v])=>{add(v,n);
+    if(v>0&&lv.sup!==null&&c-lv.sup<.8*a)add(1,'แท่งกลับตัวที่แนวรับ');
+    if(v<0&&lv.res!==null&&lv.res-c<.8*a)add(-1,'แท่งกลับตัวที่แนวต้าน')});
+  if(htf)add(htf*1,htf>0?'กรอบเวลาใหญ่ขาขึ้น':'กรอบเวลาใหญ่ขาลง');
+  if(fund!==null){if(fund>.0005)add(-.5,`Funding ${f(fund*100,3)}% Long แออัด`);else if(fund<-.0005)add(.5,`Funding ${f(fund*100,3)}% Short แออัด`)}
+  if(fg!==null){if(fg<25)add(.5,`Fear&Greed ${fg} กลัวสุดขีด`);else if(fg>75)add(-.5,`Fear&Greed ${fg} โลภสุดขีด`)}
+  if(Math.abs(news)>=.3)add(Math.round(news*10)/10,news>0?'ข่าวโลกหนุนความเสี่ยง':'ข่าวโลกกดดันตลาด');
+  return{s,w,reg,lv,adx:ax}}
+
+/* ---------- plan + filters ---------- */
+function plan(dir,en,a,lv){
+  const base=dir>0?(lv.sup!==null?en-(lv.sup-.25*a):1.2*a):(lv.res!==null?(lv.res+.25*a)-en:1.2*a);
+  const d=Math.min(2*a,Math.max(a,base));
+  const room=dir>0?(lv.res!==null?lv.res-en:Infinity):(lv.sup!==null?en-lv.sup:Infinity);
+  const t1=Math.min(1.5*a,room-.1*a);
+  return{sl:en-dir*d,slD:d,t1:en+dir*t1,t1D:t1,t2:en+dir*2.5*a,room}}
+function decide(D,i,res,thr,htf,fee,en){
+  const s=res.s;if(Math.abs(s)<thr)return null;
+  const dir=s>0?1:-1,a=D.a[i],p=plan(dir,en,a,res.lv),veto=[];
+  if(p.room<1.2*a)veto.push(dir>0?'ใกล้แนวต้านเกินไป':'ใกล้แนวรับเกินไป');
+  if(res.reg==='trend'&&htf&&htf!==dir)veto.push('สวนเทรนด์กรอบเวลาใหญ่');
+  if(p.t1D/en*100<6*fee)veto.push('ค่าธรรมเนียมกินกำไร');
+  if(p.t1D/p.slD<.8)veto.push('กำไร:ขาดทุน < 0.8');
+  return{dir,p,veto,ok:!veto.length,grade:Math.abs(s)>=thr+2?'A':'B'}}
+
+function backtest(D,H,thr,fee){const t=[];let i=210;
+  while(i<D.k.length-H-1){const r=score(D,i),d=decide(D,i,r,thr,0,fee,D.c[i]);
+    if(!d||!d.ok){i++;continue}
+    const en=D.c[i];let ex=D.c[i+H],j;
+    for(j=i+1;j<=i+H;j++){const b=D.k[j];if(d.dir>0?b.l<=d.p.sl:b.h>=d.p.sl){ex=d.p.sl;break}if(d.dir>0?b.h>=d.p.t1:b.l<=d.p.t1){ex=d.p.t1;break}}
+    t.push(d.dir*(ex-en)/en*100-fee*2);i=Math.min(j,i+H)+1}
+  const n=t.length,w=t.filter(x=>x>0),l=t.filter(x=>x<=0),gw=w.reduce((a,b)=>a+b,0),gl=Math.abs(l.reduce((a,b)=>a+b,0));
+  return{n,win:n?w.length/n*100:0,sum:t.reduce((a,b)=>a+b,0),avg:n?t.reduce((a,b)=>a+b,0)/n:0,pf:gl?gw/gl:(gw?99:0)}}
+
+/* ---------- data ---------- */
+const NEG=['war','attack','sanction','ban ','hack','exploit','crash','lawsuit','sues','rate hike','hawkish','tariff','liquidat','collapse','bankrupt','fraud','crackdown','missile','conflict','plunge','sell-off','selloff','outflow','recession','default'];
+const POS=['approval','approves','approved','rate cut','dovish','adopt','inflow','record high','rally','surge','partnership','stimulus','ceasefire','peace','soar','rebound'];
+async function loadNews(){
+  try{const j=await jget('https://min-api.cryptocompare.com/data/v2/news/?lang=EN'),now=Date.now()/1000;
+    const items=j.Data.filter(x=>now-x.published_on<86400).slice(0,50);let p=0,n=0;
+    const tagged=items.map(x=>{const t=x.title.toLowerCase(),a=POS.filter(w=>t.includes(w)).length,b=NEG.filter(w=>t.includes(w)).length;p+=a;n+=b;return{title:x.title,src:x.source,v:a-b}});
+    NEWS={score:(p+n)?Math.max(-1,Math.min(1,(p-n)/Math.max(4,p+n)*1.5)):0,items:tagged.filter(x=>x.v).slice(0,5),total:items.length,p,n}}
+  catch(e){NEWS=null}
+  try{const j=await jget('https://api.alternative.me/fng/?limit=1');FG=+j.data[0].value}catch(e){FG=null}
+  renderNews()}
+function renderNews(){
+  const n=NEWS;let h='';
+  if(n){const lab=n.score<=-.3?['กดดันตลาด','dn']:n.score>=.3?['หนุนตลาด','up']:['เป็นกลาง','wt'];
+    h+=`<div>คะแนนข่าว 24 ชม.: <b class="${lab[1]}">${lab[0]} (${f(n.score,2)})</b> <small>จาก ${n.total} พาดหัว คีย์เวิร์ดบวก ${n.p} / ลบ ${n.n}</small></div><ul>`+
+    n.items.map(x=>`<li><span>${esc(x.title)} <small>${esc(x.src)}</small></span><b class="${x.v>0?'up':'dn'}">${x.v>0?'+':'−'}</b></li>`).join('')+'</ul>'}
+  else h+='<div class="wt">โหลดข่าวไม่ได้ (ไม่นำมาคิดคะแนน)</div>';
+  h+=`<div style="margin-top:6px">Fear &amp; Greed: <b>${FG??'-'}</b></div><small>คะแนนข่าวนับจากคีย์เวิร์ดในพาดหัว เป็นเพียงตัวประมาณหยาบ ไม่ใช่การอ่านเข้าใจข่าว</small>`;
+  $('#news').innerHTML=h}
+
+
+async function pickSymbols(){
+  const set=$('#set').value;
+  if(set==='big')return BIG.slice();
+  if(set==='custom'){const l=$('#cust').value.toUpperCase().split(/[\s,]+/).filter(Boolean).map(x=>x.endsWith('USDT')?x:x+'USDT');if(!l.length)throw new Error('ยังไม่ได้ใส่ชื่อเหรียญ');return l.slice(0,24)}
+  const t=await jget(REST+'/fapi/v1/ticker/24hr');
+  const EX=new Set(['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','TRX','LINK','AVAX','LTC','DOT','BCH','SUI','TON','XLM','SHIB','HBAR','USDC','FDUSD','TUSD']);
+  const pm=P('pmax'),v0=P('vmin')*1e6,v1=P('vmax')*1e6,n=Math.min(24,Math.max(3,P('nsym')));
+  const l=t.filter(x=>/^[A-Z0-9]+USDT$/.test(x.symbol)&&!EX.has(x.symbol.replace('USDT',''))&&+x.lastPrice<=pm&&+x.quoteVolume>=v0&&+x.quoteVolume<=v1)
+    .sort((a,b)=>+b.quoteVolume-+a.quoteVolume).slice(0,n).map(x=>x.symbol);
+  if(l.length<3)throw new Error('หาเหรียญตามเงื่อนไขได้น้อยกว่า 3 ตัว ลองผ่อนเงื่อนไขราคา/ปริมาณซื้อขาย');
+  return l}
+async function loadAll(force){
+  if(loading)return;loading=true;const iv=$('#iv').value;$('#st').textContent=failMsg||'โหลดข้อมูล…';
+  if(force||!picked){let l=null,msg='';
+    try{l=await pickSymbols()}catch(e){msg='สแกนเหรียญไม่ได้ ('+e.message+') · ';if(!picked)l=BIG.slice()}
+    if(l){SYMS=l;Object.keys(S).forEach(k=>delete S[k]);sel=SYMS[0];buildGrid();fillPs();btKey=''}
+    picked=true;$('#setinfo').textContent=msg+'ชุดเหรียญที่ใช้ ('+SYMS.length+'): '+SYMS.map(x=>x.replace('USDT','')).join(', ')}
+  await Promise.all(SYMS.map(async s=>{try{
+    const[k,kh,pi]=await Promise.all([jget(`${REST}/fapi/v1/klines?symbol=${s}&interval=${iv}&limit=500`),jget(`${REST}/fapi/v1/klines?symbol=${s}&interval=${HTF[iv]}&limit=120`),jget(`${REST}/fapi/v1/premiumIndex?symbol=${s}`)]);
+    const H=prep(mapK(kh));const kk=mapK(k);if(kk.length<250)throw new Error('short');S[s]={k:kk,htf:H.e20.at(-1)>H.e50.at(-1)?1:-1,fund:+pi.lastFundingRate};S[s].D=prep(S[s].k)}catch(e){S[s]=null;ERR[s]=e.message}}));
+  const bad=SYMS.filter(x=>!S[x]);
+  if(bad.length&&bad.length<SYMS.length){SYMS=SYMS.filter(x=>S[x]);document.querySelectorAll('.panel').forEach(pn=>{if(!S[pn.dataset.s]&&pn.remove)pn.remove()});
+    $('#setinfo').textContent='ชุดเหรียญที่ใช้ ('+SYMS.length+'): '+SYMS.map(x=>x.replace('USDT','')).join(', ')+' · ใช้ไม่ได้ (ไม่พบสัญญา USDT Perpetual หรือข้อมูลน้อยไป): '+bad.map(x=>x.replace('USDT','')+'('+(ERR[x]||'?')+')').join(', ');fillPs()}
+  if(!SYMS.some(s=>S[s])){failMsg='ดึงข้อมูลไม่ได้ รหัส '+(ERR[SYMS[0]]||'?')+' (451/403 = ถูกบล็อกตามพื้นที่, Failed to fetch = เน็ต/VPN/ตัวบล็อกโฆษณา) กำลังลองใหม่…';$('#st').textContent=failMsg}else failMsg='';
+  btKey='';dirty=true;loading=false;connect()}
+function connect(){
+  try{connect2()}catch(e){wsOk=false}}
+function connect2(){
+  if(ws){ws.onclose=null;ws.close()}
+  ws=new WebSocket(WS+SYMS.map(s=>s.toLowerCase()+'@kline_'+$('#iv').value).join('/'));
+  ws.onopen=()=>{wsOk=true;$('#st').textContent='เชื่อมต่อแล้ว รอข้อมูล…'};
+  ws.onmessage=e=>{lastMsg=Date.now();if(!wsLive){wsLive=true;$('#st').textContent='● เรียลไทม์ (WebSocket)'}const m=JSON.parse(e.data).data;if(!m||!m.k)return;const st=S[m.s];if(!st)return;
+    const k=m.k,c={t:k.t,o:+k.o,h:+k.h,l:+k.l,c:+k.c};
+    if(st.k.at(-1).t===c.t)st.k[st.k.length-1]=c;else{st.k.push(c);st.k.shift()}st.dirty=true;dirty=true};
+  ws.onclose=()=>{wsOk=false;$('#st').textContent='หลุดการเชื่อมต่อ กำลังต่อใหม่…';setTimeout(connect,3000)}}
+async function slow(){
+  const iv=$('#iv').value;loadNews();
+  await Promise.all(SYMS.map(async s=>{if(!S[s])return;try{const[kh,pi]=await Promise.all([jget(`${REST}/fapi/v1/klines?symbol=${s}&interval=${HTF[iv]}&limit=120`),jget(`${REST}/fapi/v1/premiumIndex?symbol=${s}`)]);const H=prep(mapK(kh));S[s].htf=H.e20.at(-1)>H.e50.at(-1)?1:-1;S[s].fund=+pi.lastFundingRate}catch(e){}}));dirty=true}
+
+/* ---------- ui ---------- */
+const REG={trend:'เทรนด์',side:'ไซด์เวย์',mid:'กลางๆ'};
+const grid=$('#grid');
+function buildGrid(){grid.innerHTML='';SYMS.forEach(s=>{const d=document.createElement('div');d.className='panel';d.dataset.s=s;
+  d.innerHTML=`<div class="ph"><b>${s.replace('USDT','/USDT')}</b><small class="rg"></small><span class="px"></span><span class="badge b-wt">รอ</span></div><canvas></canvas>`;
+  d.onclick=()=>{sel=s;btKey='';render()};grid.appendChild(d)})}
+function fillPs(){const e=$('#ps');e.innerHTML='';SYMS.forEach(x=>e.add(new Option(x.replace('USDT','/USDT'),x)))}
+
+function draw(cv,D,thr,fee,res){
+  const dpr=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr;
+  const g=cv.getContext('2d');g.scale(dpr,dpr);
+  const N=48,n=D.k.length,off=n-N,k=D.k.slice(-N),pad=14,pr=52;
+  const hi=Math.max(...k.map(x=>x.h)),lo=Math.min(...k.map(x=>x.l)),Y=v=>pad+(hi-v)/(hi-lo||1)*(H-2*pad),cw=(W-pr)/N;
+  g.font='10px sans-serif';g.fillStyle='#8196aa';g.strokeStyle='#14202c';
+  for(let q=0;q<=3;q++){const v=lo+(hi-lo)*q/3,y=Y(v);g.beginPath();g.moveTo(0,y);g.lineTo(W-pr,y);g.stroke();g.fillText(fp(v),W-pr+3,y+3)}
+  const hl=(v,col)=>{if(v===null||v<lo||v>hi)return;g.strokeStyle=col;g.setLineDash([5,4]);g.beginPath();g.moveTo(0,Y(v));g.lineTo(W-pr,Y(v));g.stroke();g.setLineDash([])};
+  hl(res.lv.res,'#ff5c5c99');hl(res.lv.sup,'#2ee59d99');
+  const line=(a,col)=>{g.beginPath();g.strokeStyle=col;let st=false;a.slice(off).forEach((v,j)=>{if(isNaN(v))return;const x=j*cw+cw/2;st?g.lineTo(x,Y(v)):g.moveTo(x,Y(v));st=true});g.stroke()};
+  line(D.e20,'#e8b84a');line(D.e50,'#6aa9ff');line(D.s200,'#b58cff');line(D.bu,'#3b5268');line(D.bl,'#3b5268');
+  k.forEach((x,j)=>{const cx=j*cw+cw/2,up=x.c>=x.o,col=up?'#2ee59d':'#ff5c5c';g.strokeStyle=g.fillStyle=col;
+    g.beginPath();g.moveTo(cx,Y(x.h));g.lineTo(cx,Y(x.l));g.stroke();
+    g.fillRect(cx-cw*.32,Y(Math.max(x.o,x.c)),cw*.64,Math.max(1,Math.abs(Y(x.o)-Y(x.c))));
+    const i=off+j;if(i>=210&&i<=n-2){const r=i===n-2?res:score(D,i),d=decide(D,i,r,thr,0,fee,D.c[i]);
+      if(d&&d.ok){g.fillStyle=d.dir>0?'#2ee59d':'#ff5c5c';const y=d.dir>0?Y(x.l)+4:Y(x.h)-4,z=d.dir>0?8:-8;g.beginPath();g.moveTo(cx,y);g.lineTo(cx-4,y+z);g.lineTo(cx+4,y+z);g.fill()}}});
+  g.strokeStyle='#8196aa';g.setLineDash([3,3]);g.beginPath();g.moveTo(0,Y(D.k.at(-1).c));g.lineTo(W-pr,Y(D.k.at(-1).c));g.stroke();g.setLineDash([])}
+const thr=()=>P('thr');
+
+function render(){
+  if(SYMS.some(x=>S[x]))$('#st').textContent=`● สด ${new Date().toLocaleTimeString('th-TH')} · ${wsLive?'WebSocket+REST':'REST ทุก 3 วิ'}`;
+  const T=thr(),cap=P('cap'),risk=P('risk'),maxpos=Math.max(1,P('maxpos')),maxlev=P('maxlev'),totrisk=P('totrisk'),fee=P('fee'),H=P('hold'),news=NEWS?NEWS.score:0,goal=P('goal');
+  document.querySelectorAll('.panel').forEach(p=>{const s=p.dataset.s,st=S[s];if(!st)return;
+    if(st.dirty||!st.D){st.D=prep(st.k);st.dirty=false}
+    const D=st.D,i=D.k.length-2,res=score(D,i,{htf:st.htf,fg:FG,fund:st.fund,news});
+    st.res=res;st.live=D.k.at(-1).c;st.dec=decide(D,i,res,T,st.htf,fee,st.live);
+    p.classList.toggle('sel',s===sel);p.querySelector('.px').textContent=fp(st.live);p.querySelector('.rg').textContent=REG[res.reg];
+    const b=p.querySelector('.badge'),d=st.dec;
+    b.textContent=d?(d.ok?(d.dir>0?'LONG ':'SHORT ')+d.grade:'ติดเงื่อนไข'):(Math.abs(res.s)>=T-1?(res.s>0?'ใกล้ LONG':'ใกล้ SHORT'):'รอ');b.className='badge '+(d&&d.ok?(d.dir>0?'b-up':'b-dn'):'b-wt');
+    draw(p.querySelector('canvas'),D,T,fee,res)});
+  // portfolio
+  const cand=SYMS.filter(s=>S[s]&&S[s].dec&&S[s].dec.ok).sort((x,y)=>Math.abs(S[y].res.s)-Math.abs(S[x].res.s)).slice(0,maxpos);
+  const margin=cap/maxpos;
+  const rows=cand.map(s=>{const st=S[s],d=st.dec,p=d.p,en=st.live,slPct=p.slD/en+2*fee/100;let nt=risk/slPct,lev=nt/margin;if(lev>maxlev){nt=maxlev*margin;lev=maxlev}return{s,d,p,en,nt,lev,rk:nt*slPct,slPct}});
+  const sum=rows.reduce((a,r)=>a+r.rk,0);if(sum>totrisk)rows.forEach(r=>{const q=totrisk/sum;r.nt*=q;r.lev*=q;r.rk*=q});
+  $('#folio').innerHTML=rows.length?`<table><tr><th>คู่</th><th>ทิศ</th><th>เกรด</th><th>เข้า</th><th>SL</th><th>TP1</th><th>TP2</th><th>ขนาด (บาท)</th><th>เลเวอเรจ</th><th>เสี่ยง</th><th>ได้ถ้าถึง TP1</th><th>ขนาดที่ต้องใช้ถ้าจะได้เป้า (บาท)</th></tr>`+
+    rows.map(r=>{const ntG=goal/(r.p.t1D/r.en-2*fee/100),lG=ntG/margin;return `<tr><td>${r.s.replace('USDT','')}</td><td class="${r.d.dir>0?'up':'dn'}"><b>${r.d.dir>0?'LONG':'SHORT'}</b></td><td>${r.d.grade}</td><td>${fp(r.en)}</td><td class="dn">${fp(r.p.sl)}</td><td class="up">${fp(r.p.t1)}</td><td class="up">${fp(r.p.t2)}</td><td>${f(r.nt,0)}</td><td>${f(r.lev,1)}x</td><td class="dn">${f(r.rk,0)}</td><td class="up">${f(r.nt*(r.p.t1D/r.en-2*fee/100),0)}</td><td class="${lG>maxlev?'dn':'wt'}">${f(ntG,0)} (${f(lG,1)}x)</td></tr>`}).join('')+'</table>':'<div class="wt">ตอนนี้ไม่มีไม้ที่ผ่านทุกด่าน ยืนรอเฉยๆ ก็เป็นการเทรดที่ดีเหมือนกัน</div>';
+  const nl=rows.filter(r=>r.d.dir>0).length,ns=rows.length-nl,vet=SYMS.filter(s=>S[s]&&S[s].dec&&!S[s].dec.ok).map(s=>s.replace('USDT','')+': '+S[s].dec.veto.join(', '));
+  $('#folioNote').textContent=(Math.max(nl,ns)>=2?'คริปโตเคลื่อนไหวพร้อมกัน ไม้ทิศเดียวกันจริงๆ คือเดิมพันเดียวกัน ความเสี่ยงรวมจึงถูกจำกัดไว้แล้ว ':'')+(vet.length?'ถูกตัดออก → '+vet.join(' | '):'');
+  cmdAndPos(rows,T,H);
+  // detail
+  const st=S[sel];if(!st||!st.res)return;const D=st.D,i=D.k.length-2,res=st.res,s=res.s,d=st.dec,en=st.live;
+  const c=d&&d.ok?(d.dir>0?'up':'dn'):'wt';
+  $('#t1').textContent=`${sel.replace('USDT','/USDT')} Perp · ${$('#iv').value} · ราคา ${fp(en)} · ตลาด${REG[res.reg]} (ADX ${f(res.adx,0)})`;
+  $('#dir').textContent=d&&d.ok?(d.dir>0?'LONG ▲ เปิดซื้อ':'SHORT ▼ เปิดขาย'):d?'คะแนนถึงแต่ติดเงื่อนไข':'รอ ■';$('#dir').className='big '+c;
+  $('#sc').innerHTML=`คะแนน ${s>0?'+':''}${f(s,1)} (เกณฑ์ ±${T}) · ผันผวน ${f(D.a[i]/en*100,2)}%/แท่ง · แนวรับ ${res.lv.sup!==null?fp(res.lv.sup):'-'} · แนวต้าน ${res.lv.res!==null?fp(res.lv.res):'-'}`+(d&&!d.ok?`<br><b class="wt">ไม่เข้าเพราะ: ${d.veto.join(', ')}</b>`:'');
+  $('#why').innerHTML=res.w.map(([v,t])=>`<li><span>${t}</span><b class="${v>0?'up':'dn'}">${v>0?'+':''}${v}</b></li>`).join('');
+  const G=gates(D,i,res,T,st.htf,fee,en),allOk=G.every(g=>g[0]);
+  $('#gates').innerHTML=G.map(([ok,n,t])=>`<li><span>${ok?'✓':'✗'} ${n} <small>${t}</small></span><b class="${ok?'up':'dn'}">${ok?'ผ่าน':'ไม่ผ่าน'}</b></li>`).join('')+`<li><b class="${allOk?'up':'wt'}">${allOk?'ผ่านครบทุกข้อ → เข้าได้':'ยังไม่ผ่านครบ → รอ'}</b><span></span></li>`;
+  if(d&&d.ok){const p=d.p,slp=p.slD/en,nt=Math.min(risk/(slp+2*fee/100),maxlev*margin),lev=nt/margin,liq=100/Math.max(lev,1);
+    const gp=p.t1D/en-2*fee/100,ntG=goal/gp,levG=ntG/margin,lossG=ntG*(slp+2*fee/100);
+    $('#plan').innerHTML=`<span>ทิศทาง / เกรด</span><b class="${c}">${d.dir>0?'LONG':'SHORT'} · ${d.grade}</b><span>เข้า</span><b>${fp(en)}</b>
+     <span>Stop-loss</span><b class="dn">${fp(p.sl)} (${f(slp*100)}%)</b>
+     <span>ขายรอบ 1 (ปิดครึ่งหนึ่ง แล้วเลื่อน SL มาที่ทุน)</span><b class="up">${fp(p.t1)}</b>
+     <span>ขายรอบ 2 (ที่เหลือ)</span><b class="up">${fp(p.t2)}</b>
+     <span>ออกตามเวลา</span><b>ไม่เกิน ${H} แท่ง</b>
+     <span>ขนาดสถานะ / เลเวอเรจ</span><b>${f(nt,0)} บาท / ${f(lev,1)}x</b>
+     <span>ล้างพอร์ตถ้าราคาสวนประมาณ</span><b class="${slp*100>liq*.5?'dn':'wt'}">${f(liq)}%</b>
+     <span>ถ้าอยากได้ ${f(goal,0)} บาทที่เป้า 1 ต้องใช้ขนาด</span><b class="${levG>maxlev?'dn':'wt'}">${f(ntG,0)} บาท (${f(levG,1)}x)</b>
+     <span>แล้วถ้าชน SL จะเสียประมาณ</span><b class="${lossG>risk*1.5?'dn':'wt'}">${f(lossG,0)} บาท</b>
+     <span>เป้านี้ทำได้ไหม</span><b class="${levG>maxlev?'dn':'up'}">${levG>maxlev?'ไม่ได้ เกินเลเวอเรจสูงสุด '+maxlev+'x ลดเป้าหรือเสี่ยงเพิ่ม':'ได้ ภายในเลเวอเรจที่ตั้งไว้'}</b>`}
+  else $('#plan').innerHTML='<span>ยังไม่มีจุดเข้า</span><b class="wt">รอ</b>';
+  const key=sel+D.k.at(-2).t+T+fee+H;if(key!==btKey){btKey=key;BT=backtest(D,H,T,fee)}
+  const b=BT;$('#bt').innerHTML=b.n?`<span>จำนวนไม้</span><b>${b.n}</b><span>อัตราชนะ</span><b>${f(b.win,1)}%</b>
+   <span>กำไรเฉลี่ย/ไม้ (หลังค่าธรรมเนียม)</span><b class="${b.avg>0?'up':'dn'}">${f(b.avg,3)}%</b><span>รวมทั้งช่วง (1x)</span><b class="${b.sum>0?'up':'dn'}">${f(b.sum)}%</b>
+   <span>Profit factor</span><b class="${b.pf>=1.3?'up':b.pf<1?'dn':'wt'}">${f(b.pf)}</b>`+(b.n<20?'<span>หมายเหตุ</span><b class="wt">ไม้น้อย ตัวเลขยังเชื่อไม่ได้</b>':''):'<span>ไม่มีไม้ถึงเกณฑ์ในช่วงนี้</span><b></b>';
+  $('#meta').textContent=`Funding ${sel}: ${st.fund!=null?f(st.fund*100,4)+'%':'-'} · อัปเดต ${new Date().toLocaleTimeString('th-TH')}`}
+
+
+
+function gates(D,i,res,T,htf,fee,en){
+  const s=res.s,dir=s>=0?1:-1,a=D.a[i],p=plan(dir,en,a,res.lv),G=[];
+  G.push([Math.abs(s)>=T,'คะแนนรวมถึงเกณฑ์',`${f(Math.abs(s),1)} / ต้องการ ${T}`+(Math.abs(s)<T?` (ขาดอีก ${f(T-Math.abs(s),1)})`:'')]);
+  G.push([p.room>=1.2*a,dir>0?'ไม่ชนแนวต้านเร็วเกินไป':'ไม่ชนแนวรับเร็วเกินไป',p.room===Infinity?'ไม่มีแนวขวางใกล้ๆ':`เหลือที่ให้วิ่ง ${f(p.room/a,1)} เท่าของ ATR / ต้องการ 1.2`]);
+  const tOk=!(res.reg==='trend'&&htf&&htf!==dir);
+  G.push([tOk,'ไม่สวนเทรนด์กรอบเวลาใหญ่',res.reg==='trend'?(tOk?'ไปทางเดียวกัน':'สวนทางกัน'):'ตลาดไม่ใช่เทรนด์ ข้ามข้อนี้']);
+  const tp=p.t1D/en*100;
+  G.push([tp>=6*fee,'กำไรเป้า 1 มากกว่าค่าธรรมเนียมพอ',`${f(tp,2)}% / ต้องการอย่างน้อย ${f(6*fee,2)}%`]);
+  const rr=p.t1D/p.slD;
+  G.push([rr>=.8,'กำไรต่อขาดทุนไม่ต่ำเกินไป',`${f(rr,2)} / ต้องการอย่างน้อย 0.8`]);
+  return G}
+/* ---------- command banner, alerts, position tracker ---------- */
+function beep(){try{const a=new(window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator();o.connect(a.destination);o.frequency.value=880;o.start();setTimeout(()=>{o.stop();a.close()},250)}catch(e){}}
+try{MYP=JSON.parse(localStorage.getItem('pos')||'null')}catch(e){}
+$('#pset').onclick=()=>{const sy=$('#ps').value,st=S[sy];if(!st||!st.res)return;
+  const dir=+$('#pd').value,en=+$('#pe').value||st.live,pl=plan(dir,en,st.D.a[st.D.k.length-2],st.res.lv);
+  MYP={s:sy,dir,en,sl:+$('#psl').value||pl.sl,t1:+$('#ptp').value||pl.t1,t2:pl.t2,t0:Date.now(),moved:false};
+  try{localStorage.setItem('pos',JSON.stringify(MYP))}catch(e){}dirty=true};
+$('#pclr').onclick=()=>{MYP=null;try{localStorage.removeItem('pos')}catch(e){}dirty=true};
+function cmdAndPos(rows,T,H){
+  let h='<h2>คำสั่งตอนนี้</h2>';
+  if(rows.length)h+=rows.map(r=>`<div style="font-size:18px;margin:4px 0"><b class="${r.d.dir>0?'up':'dn'}">${r.d.dir>0?'กด LONG':'กด SHORT'} ${r.s.replace('USDT','')}</b> เข้า ${fp(r.en)} · <span class="dn">SL ${fp(r.p.sl)}</span> · <span class="up">ขาย TP1 ${fp(r.p.t1)} / TP2 ${fp(r.p.t2)}</span> · ขนาด ${f(r.nt,0)} บาท (${f(r.lev,1)}x)</div>`).join('');
+  else h+='<div style="font-size:18px" class="wt">ยังไม่มีไม้ที่ผ่านเกณฑ์ → รอ อย่าเพิ่งเข้า</div>';
+  $('#cmd').innerHTML=h;
+  const sig=rows.map(r=>r.s+r.d.dir).join(',');
+  if(sig!==lastSig){if(lastSig!==null&&rows.length){beep();document.title='🔔 มีสัญญาณใหม่ · Futures Signal'}lastSig=sig}
+  const po=$('#pout');
+  if(!MYP||!S[MYP.s]||!S[MYP.s].res){po.innerHTML='<span>ยังไม่ได้ติดตามไม้</span><b></b>';return}
+  const st=S[MYP.s],px=st.live,d=MYP.dir,pnl=d*(px-MYP.en)/MYP.en*100;
+  const ms={'5m':3e5,'15m':9e5,'1h':36e5}[$('#iv').value],bars=(Date.now()-MYP.t0)/ms;
+  if(!MYP.moved&&(d>0?px>=MYP.t1:px<=MYP.t1)){MYP.moved=true;MYP.sl=MYP.en;try{localStorage.setItem('pos',JSON.stringify(MYP))}catch(e){}}
+  let cmd,cl;
+  if(d>0?px<=MYP.sl:px>=MYP.sl){cmd=MYP.moved?'ออกที่เหลือ: ราคากลับมาที่ทุน':'ออกทันที: ชน Stop-loss';cl='dn'}
+  else if(d>0?px>=MYP.t2:px<=MYP.t2){cmd='ขายที่เหลือทั้งหมด: ถึงเป้า 2';cl='up'}
+  else if(st.res.s*d<=-thr()){cmd='ออกตอนนี้: สัญญาณกลับด้านแล้ว';cl='dn'}
+  else if(bars>=H){cmd='ออกตามเวลา: ถือครบ '+H+' แท่ง';cl='wt'}
+  else if(MYP.moved){cmd='ปิดครึ่งแรกแล้ว ถือที่เหลือต่อ SL เลื่อนมาที่ทุน';cl='up'}
+  else{cmd='ถือต่อ';cl='up'}
+  po.innerHTML=`<span>${MYP.s.replace('USDT','/USDT')} ${d>0?'LONG':'SHORT'} เข้า ${fp(MYP.en)} → ตอนนี้ ${fp(px)}</span><b class="${pnl>=0?'up':'dn'}">${pnl>=0?'+':''}${f(pnl)}% (ก่อนเลเวอเรจ)</b>
+  <span>คำสั่ง</span><b class="${cl}" style="font-size:18px">${cmd}</b>
+  <span>SL / TP1 / TP2</span><b>${fp(MYP.sl)} / ${fp(MYP.t1)} / ${fp(MYP.t2)}</b><span>ถือมาแล้ว</span><b>${f(bars,1)} / ${H} แท่ง</b>`}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)document.title='Futures Signal'});
+
+async function poll(){
+  if(!SYMS.some(x=>S[x])){loadAll();return}
+  wsLive=wsOk&&Date.now()-lastMsg<15000;
+  await Promise.all(SYMS.map(async x=>{const st=S[x];if(!st)return;try{
+    const j=mapK(await jget(`${REST}/fapi/v1/klines?symbol=${x}&interval=${$('#iv').value}&limit=3`));
+    j.forEach(c=>{const L=st.k.at(-1);if(L.t===c.t)st.k[st.k.length-1]=c;else if(c.t>L.t){st.k.push(c);st.k.shift()}});st.dirty=true;dirty=true}catch(e){}}));
+}
+setInterval(poll,3000);
+const normSyms=t=>t.toUpperCase().split(/[\s,]+/).filter(Boolean).map(x=>x.endsWith('USDT')?x:x+'USDT');
+$('#addb').onclick=()=>{const n=normSyms($('#addc').value);if(!n.length)return;
+  SYMS=[...new Set([...SYMS,...n])].slice(0,24);picked=true;Object.keys(S).forEach(k=>delete S[k]);buildGrid();fillPs();btKey='';$('#addc').value='';
+  $('#setinfo').textContent='ชุดเหรียญที่ใช้ ('+SYMS.length+'): '+SYMS.map(x=>x.replace('USDT','')).join(', ');loadAll()};
+$('#resetb').onclick=()=>loadAll(true);
+$('#rescan').onclick=()=>loadAll(true);$('#set').onchange=()=>loadAll(true);
+$('#iv').onchange=()=>{$('#hold').value=HOLD[$('#iv').value];loadAll()};
+['cap','risk','maxpos','maxlev','totrisk','fee','thr','hold','goal'].forEach(id=>$('#'+id).onchange=()=>{btKey='';dirty=true});
+setInterval(()=>{if(dirty){dirty=false;render()}},1000);
+setInterval(slow,60000);addEventListener('resize',()=>{dirty=true});
+$('#hold').value=HOLD[$('#iv').value];loadNews();loadAll();
+</script>
+</body>
+</html>
