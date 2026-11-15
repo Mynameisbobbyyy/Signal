@@ -41,7 +41,7 @@ button{background:#1d3a52;color:var(--tx);border:1px solid #2c5679;border-radius
 </head>
 <body>
 <main>
-<h1>Futures Signal v4.1 <small>Binance Futures · เรียลไทม์</small></h1>
+<h1>Futures Signal v4.2 <small>Binance Futures · เรียลไทม์</small></h1>
 <div class="top">
 <label>กรอบเวลา<select id="iv"><option value="5m">5 นาที</option><option value="15m" selected>15 นาที</option><option value="1h">1 ชั่วโมง</option></select></label>
 <label>เงินทุน (บาท)<input id="cap" type="number" value="1000"></label>
@@ -87,6 +87,10 @@ button{background:#1d3a52;color:var(--tx);border:1px solid #2c5679;border-radius
 <small id="meta"></small>
 </main>
 <script>
+function showErr(m){let b=document.getElementById('errbox');if(!b){b=document.createElement('div');b.id='errbox';b.style.cssText='position:sticky;top:0;z-index:9;background:#5a1a1a;color:#fff;padding:8px 12px;font-size:13px';document.body.prepend(b)}b.textContent='⚠ มีข้อผิดพลาด: '+m}
+window.addEventListener('error',e=>showErr(e.message+' (บรรทัด '+e.lineno+')'));
+window.addEventListener('unhandledrejection',e=>showErr(String(e.reason&&e.reason.message||e.reason)));
+const ERR={};let failMsg='';
 const BIG=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','DOGEUSDT'];
 let SYMS=BIG.slice(),picked=false;
 const REST='https://fapi.binance.com',WS='wss://fstream.binance.com/market/stream?streams=';
@@ -219,20 +223,22 @@ async function pickSymbols(){
   if(l.length<3)throw new Error('หาเหรียญตามเงื่อนไขได้น้อยกว่า 3 ตัว ลองผ่อนเงื่อนไขราคา/ปริมาณซื้อขาย');
   return l}
 async function loadAll(force){
-  if(loading)return;loading=true;const iv=$('#iv').value;$('#st').textContent='โหลดข้อมูล…';
+  if(loading)return;loading=true;const iv=$('#iv').value;$('#st').textContent=failMsg||'โหลดข้อมูล…';
   if(force||!picked){let l=null,msg='';
-    try{l=await pickSymbols()}catch(e){msg=e.message+' · ';if(!picked)l=BIG.slice()}
+    try{l=await pickSymbols()}catch(e){msg='สแกนเหรียญไม่ได้ ('+e.message+') · ';if(!picked)l=BIG.slice()}
     if(l){SYMS=l;Object.keys(S).forEach(k=>delete S[k]);sel=SYMS[0];buildGrid();fillPs();btKey=''}
     picked=true;$('#setinfo').textContent=msg+'ชุดเหรียญที่ใช้ ('+SYMS.length+'): '+SYMS.map(x=>x.replace('USDT','')).join(', ')}
   await Promise.all(SYMS.map(async s=>{try{
     const[k,kh,pi]=await Promise.all([jget(`${REST}/fapi/v1/klines?symbol=${s}&interval=${iv}&limit=500`),jget(`${REST}/fapi/v1/klines?symbol=${s}&interval=${HTF[iv]}&limit=120`),jget(`${REST}/fapi/v1/premiumIndex?symbol=${s}`)]);
-    const H=prep(mapK(kh));const kk=mapK(k);if(kk.length<250)throw new Error('short');S[s]={k:kk,htf:H.e20.at(-1)>H.e50.at(-1)?1:-1,fund:+pi.lastFundingRate};S[s].D=prep(S[s].k)}catch(e){S[s]=null}}));
+    const H=prep(mapK(kh));const kk=mapK(k);if(kk.length<250)throw new Error('short');S[s]={k:kk,htf:H.e20.at(-1)>H.e50.at(-1)?1:-1,fund:+pi.lastFundingRate};S[s].D=prep(S[s].k)}catch(e){S[s]=null;ERR[s]=e.message}}));
   const bad=SYMS.filter(x=>!S[x]);
   if(bad.length&&bad.length<SYMS.length){SYMS=SYMS.filter(x=>S[x]);document.querySelectorAll('.panel').forEach(pn=>{if(!S[pn.dataset.s]&&pn.remove)pn.remove()});
-    $('#setinfo').textContent='ชุดเหรียญที่ใช้ ('+SYMS.length+'): '+SYMS.map(x=>x.replace('USDT','')).join(', ')+' · ใช้ไม่ได้ (ไม่พบสัญญา USDT Perpetual หรือข้อมูลน้อยไป): '+bad.map(x=>x.replace('USDT','')).join(', ');fillPs()}
-  if(!SYMS.some(s=>S[s]))$('#st').textContent='ดึงข้อมูลไม่ได้ (เช็คเน็ต/VPN หรือการเข้าถึง Binance Futures)';
+    $('#setinfo').textContent='ชุดเหรียญที่ใช้ ('+SYMS.length+'): '+SYMS.map(x=>x.replace('USDT','')).join(', ')+' · ใช้ไม่ได้ (ไม่พบสัญญา USDT Perpetual หรือข้อมูลน้อยไป): '+bad.map(x=>x.replace('USDT','')+'('+(ERR[x]||'?')+')').join(', ');fillPs()}
+  if(!SYMS.some(s=>S[s])){failMsg='ดึงข้อมูลไม่ได้ รหัส '+(ERR[SYMS[0]]||'?')+' (451/403 = ถูกบล็อกตามพื้นที่, Failed to fetch = เน็ต/VPN/ตัวบล็อกโฆษณา) กำลังลองใหม่…';$('#st').textContent=failMsg}else failMsg='';
   btKey='';dirty=true;loading=false;connect()}
 function connect(){
+  try{connect2()}catch(e){wsOk=false}}
+function connect2(){
   if(ws){ws.onclose=null;ws.close()}
   ws=new WebSocket(WS+SYMS.map(s=>s.toLowerCase()+'@kline_'+$('#iv').value).join('/'));
   ws.onopen=()=>{wsOk=true;$('#st').textContent='เชื่อมต่อแล้ว รอข้อมูล…'};
